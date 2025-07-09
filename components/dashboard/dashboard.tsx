@@ -86,47 +86,51 @@ export default function Dashboard() {
     }
   };
 
+  // Helper to handle API responses that may be immediate or task-based
+  const handleApiResponse = async (response: Response, onSuccess: (result: any) => void, onError: (errMsg: string) => void, pollTaskStatusFn?: (taskId: string, onSuccess: (result: any) => void, onError: (errMsg: string) => void, onProgress?: (state: string) => void) => void, onProgress?: (state: string) => void) => {
+    const data = await response.json();
+    if (!response.ok) {
+      onError(data.message || `Error: ${response.status} ${response.statusText}`);
+      return;
+    }
+    if (data.task_id && pollTaskStatusFn) {
+      pollTaskStatusFn(data.task_id, onSuccess, onError, onProgress);
+    } else if (data.result) {
+      // Immediate result
+      onSuccess(data.result);
+    } else {
+      // Some endpoints may return data directly (e.g., message, path, etc.)
+      onSuccess(data);
+    }
+  };
+
   // Load model API call
   const loadModel = async () => {
     if (!selectedModel) {
       setErrorMessage("Please select a model first");
       return;
     }
-  
     clearMessages();
     setIsLoadingModel(true);
-  
     try {
       const response = await fetch(`https://flaskapi4samay-production.up.railway.app/load_model`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ model_name: selectedModel }),
       });
-  
-      const data = await response.json();
-  
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to load model");
-      }
-  
-      if (data.task_id) {
-        pollTaskStatus(
-          data.task_id,
-          (result) => {
-            setApiMessage(result.message || "Model loaded successfully");
-            setIsModelLoaded(true);
-            setIsLoadingModel(false);
-          },
-          (errMsg) => {
-            setErrorMessage(errMsg);
-            setIsLoadingModel(false);
-          }
-        );
-      } else {
-        setApiMessage(data.message || "Model loaded successfully");
-        setIsModelLoaded(true);
-        setIsLoadingModel(false);
-      }
+      await handleApiResponse(
+        response,
+        (result) => {
+          setApiMessage(result.message || "Model loaded successfully");
+          setIsModelLoaded(true);
+          setIsLoadingModel(false);
+        },
+        (errMsg) => {
+          setErrorMessage(errMsg);
+          setIsLoadingModel(false);
+        },
+        pollTaskStatus
+      );
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "An error occurred while loading the model");
       setIsLoadingModel(false);
@@ -139,45 +143,29 @@ export default function Dashboard() {
       setErrorMessage("Please select a CSV file to upload");
       return;
     }
-  
     clearMessages();
     setIsUploading(true);
-  
     try {
       const formData = new FormData();
       formData.append("dataset", file);
-  
       const response = await fetch(`https://flaskapi4samay-production.up.railway.app/upload_dataset`, {
         method: "POST",
         body: formData,
       });
-  
-      const data = await response.json();
-  
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to upload dataset");
-      }
-  
-      if (data.task_id) {
-        pollTaskStatus(
-          data.task_id,
-          (result) => {
-            setUploadedPath(result.path || null);
-            setApiMessage(result.message || "Dataset uploaded successfully");
-            setIsDataLoaded(true);
-            setIsUploading(false);
-          },
-          (errMsg) => {
-            setErrorMessage(errMsg);
-            setIsUploading(false);
-          }
-        );
-      } else {
-        setUploadedPath(data.path || null);
-        setApiMessage(data.message || "Dataset uploaded successfully");
-        setIsDataLoaded(true);
-        setIsUploading(false);
-      }
+      await handleApiResponse(
+        response,
+        (result) => {
+          setUploadedPath(result.path || null);
+          setApiMessage(result.message || "Dataset uploaded successfully");
+          setIsDataLoaded(true);
+          setIsUploading(false);
+        },
+        (errMsg) => {
+          setErrorMessage(errMsg);
+          setIsUploading(false);
+        },
+        pollTaskStatus
+      );
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "An error occurred while uploading the dataset");
       setIsUploading(false);
@@ -187,39 +175,38 @@ export default function Dashboard() {
   // Finetune model API call
   const finetune = async () => {
     if (!isModelLoaded) {
-      setErrorMessage("Please load a model first")
-      return
+      setErrorMessage("Please load a model first");
+      return;
     }
-
     if (!isDataLoaded) {
-      setErrorMessage("Please upload a dataset first")
-      return
+      setErrorMessage("Please upload a dataset first");
+      return;
     }
-
-    clearMessages()
-    setIsFinetuning(true)
-
+    clearMessages();
+    setIsFinetuning(true);
     try {
       const response = await fetch(`https://flaskapi4samay-production.up.railway.app/finetune`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ model_name: selectedModel, dataset_name: "uploaded" }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to finetune model")
-      }
-
-      setApiMessage(data.message || "Model fine-tuned successfully")
+      });
+      await handleApiResponse(
+        response,
+        (result) => {
+          setApiMessage(result.message || "Model fine-tuned successfully");
+          setIsFinetuning(false);
+        },
+        (errMsg) => {
+          setErrorMessage(errMsg);
+          setIsFinetuning(false);
+        },
+        pollTaskStatus
+      );
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "An error occurred while finetuning the model")
-      console.error("Finetune error:", error)
-    } finally {
-      setIsFinetuning(false)
+      setErrorMessage(error instanceof Error ? error.message : "An error occurred while finetuning the model");
+      setIsFinetuning(false);
     }
-  }
+  };
 
   // Generate plot API call
   const generatePlot = async (finetuneOption = "no", epochs = 10) => {
@@ -227,21 +214,17 @@ export default function Dashboard() {
       setErrorMessage("Please load a model first");
       return;
     }
-  
     if (!isDataLoaded) {
       setErrorMessage("Please upload a dataset first");
       return;
     }
-  
     if (!uploadedPath) {
       setErrorMessage("No dataset path available. Please re-upload your dataset.");
       return;
     }
-  
     clearMessages();
     setPlotUrl(null);
     setIsGeneratingPlot(true);
-  
     try {
       const response = await fetch(`https://flaskapi4samay-production.up.railway.app/run_inference`, {
         method: "POST",
@@ -254,34 +237,23 @@ export default function Dashboard() {
           epochs: epochs,
         }),
       });
-  
-      const data = await response.json();
-  
-      if (!response.ok) {
-        throw new Error(data.message || `Error: ${response.status} ${response.statusText}`);
-      }
-  
-      if (data.task_id) {
-        pollTaskStatus(
-          data.task_id,
-          (result) => {
-            if (result.result_path) {
-              setPlotUrl(`https://flaskapi4samay-production.up.railway.app${result.result_path}`);
-              setApiMessage("Plot generated successfully");
-            } else {
-              setErrorMessage(result.message || "Failed to generate plot");
-            }
-            setIsGeneratingPlot(false);
-          },
-          (errMsg) => {
-            setErrorMessage(errMsg);
-            setIsGeneratingPlot(false);
+      await handleApiResponse(
+        response,
+        (result) => {
+          if (result.result_path) {
+            setPlotUrl(`https://flaskapi4samay-production.up.railway.app${result.result_path}`);
+            setApiMessage("Plot generated successfully");
+          } else {
+            setErrorMessage(result.message || "Failed to generate plot");
           }
-        );
-      } else {
-        setErrorMessage("No task ID returned from server.");
-        setIsGeneratingPlot(false);
-      }
+          setIsGeneratingPlot(false);
+        },
+        (errMsg) => {
+          setErrorMessage(errMsg);
+          setIsGeneratingPlot(false);
+        },
+        pollTaskStatus
+      );
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "An error occurred while generating the plot");
       setIsGeneratingPlot(false);
