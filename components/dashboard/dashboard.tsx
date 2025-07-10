@@ -24,6 +24,7 @@ export default function Dashboard() {
   const [apiMessage, setApiMessage] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [uploadedPath, setUploadedPath] = useState<string | null>(null)
+  const [imageB64, setImageB64] = useState<string | null>(null);
 
   // Loading states
   const [isLoadingModel, setIsLoadingModel] = useState<boolean>(false)
@@ -224,6 +225,7 @@ export default function Dashboard() {
     }
     clearMessages();
     setPlotUrl(null);
+    setImageB64(null);
     setIsGeneratingPlot(true);
     try {
       const response = await fetch(`https://flaskapi4samay-production.up.railway.app/run_inference`, {
@@ -240,7 +242,10 @@ export default function Dashboard() {
       await handleApiResponse(
         response,
         (result) => {
-          if (result.result_path) {
+          if (result.image_b64) {
+            setImageB64(result.image_b64);
+            setApiMessage("Plot generated successfully");
+          } else if (result.result_path) {
             setPlotUrl(`https://flaskapi4samay-production.up.railway.app${result.result_path}`);
             setApiMessage("Plot generated successfully");
           } else {
@@ -427,7 +432,30 @@ export default function Dashboard() {
         )}
 
         {/* Plot Display */}
-        {plotUrl ? (
+        {imageB64 ? (
+          <Card className="transition-opacity duration-500 ease-in-out">
+            <CardHeader>
+              <CardTitle>Forecast Results</CardTitle>
+              <CardDescription>Time-series forecast visualization</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col items-center justify-center">
+              <img
+                src={`data:image/png;base64,${imageB64}`}
+                alt="Forecast Plot"
+                className="max-w-full border rounded-md shadow-sm"
+              />
+              <Button
+                asChild
+                variant="outline"
+                className="mt-4"
+              >
+                <a href={`data:image/png;base64,${imageB64}`} download="forecast.png">
+                  Download Image
+                </a>
+              </Button>
+            </CardContent>
+          </Card>
+        ) : plotUrl ? (
           <Card className="transition-opacity duration-500 ease-in-out">
             <CardHeader>
               <CardTitle>Forecast Results</CardTitle>
