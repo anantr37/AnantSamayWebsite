@@ -156,7 +156,7 @@ export default function Dashboard() {
       await handleApiResponse(
         response,
         (result) => {
-          if (result.message && result.message.toLowerCase().includes("CSV must contain at least")) {
+          if (result.message && result.message.toLowerCase().includes("csv must contain at least")) {
             setErrorMessage(result.message);
             setIsUploading(false);
             setIsDataLoaded(false);
