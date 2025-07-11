@@ -156,6 +156,14 @@ export default function Dashboard() {
       await handleApiResponse(
         response,
         (result) => {
+          if (result.message && result.message.toLowerCase().includes("CSV must contain at least")) {
+            setErrorMessage(result.message);
+            setIsUploading(false);
+            setIsDataLoaded(false);
+            setUploadedPath(null);
+            setApiMessage(null);
+            return;
+          }
           setUploadedPath(result.path || null);
           setApiMessage(result.message || "Dataset uploaded successfully");
           setIsDataLoaded(true);
@@ -164,6 +172,9 @@ export default function Dashboard() {
         (errMsg) => {
           setErrorMessage(errMsg);
           setIsUploading(false);
+          setIsDataLoaded(false);
+          setUploadedPath(null);
+          setApiMessage(null);
         },
         pollTaskStatus
       );
