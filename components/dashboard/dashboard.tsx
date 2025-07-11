@@ -162,6 +162,7 @@ export default function Dashboard() {
             setIsDataLoaded(false);
             setUploadedPath(null);
             setApiMessage(null);
+            setUploadedFile(null); // Clear the file to reset uploader UI
             return;
           }
           setUploadedPath(result.path || null);
