@@ -25,6 +25,7 @@ export default function Dashboard() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [uploadedPath, setUploadedPath] = useState<string | null>(null)
   const [imageB64, setImageB64] = useState<string | null>(null);
+  const [resetUploader, setResetUploader] = useState(0);
 
   // Loading states
   const [isLoadingModel, setIsLoadingModel] = useState<boolean>(false)
@@ -163,6 +164,7 @@ export default function Dashboard() {
             setUploadedPath(null);
             setApiMessage(null);
             setUploadedFile(null); // Clear the file to reset uploader UI
+            setResetUploader(prev => prev + 1); // Force remount of DataUploader
             return;
           }
           setUploadedPath(result.path || null);
@@ -326,7 +328,7 @@ export default function Dashboard() {
                   Example file loaded
                 </div>
               ) : (
-                <DataUploader key={selectedModel} onUpload={handleDatasetUpload} isUploading={isUploading} />
+                <DataUploader key={selectedModel + '-' + resetUploader} onUpload={handleDatasetUpload} isUploading={isUploading} />
               )}
             </CardContent>
             <CardFooter className="flex justify-between">
